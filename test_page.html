@@ -4,56 +4,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Google Analytics Server</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.4.1/mdb.min.css" rel="stylesheet" />
 
     <script>
         (function () {
             // Simulate a queue for tracking events
             const eventQueue = [];
-
-            // Replace with your actual tracking endpoint
-            const trackingEndpoint = 'http://127.0.0.1:5000/tracking/js';
+            window.eventQueue = eventQueue
 
             // Function to send events to the tracking server
             function sendEventToServer(eventData) {
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', trackingEndpoint, true);
                 xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.onload = function () {
+                    console.log(this.response)
+                };
+                xhr.onerror = function () { };
                 xhr.send(JSON.stringify(eventData));
 
-                xhr.onload = function () { };
-                xhr.onerror = function () { };
             }
+
+            var elementCSSPath = function (el) {
+                if (!(el instanceof Element)) return;
+
+                var path = [];
+                while (el.nodeType === Node.ELEMENT_NODE) {
+                    var selector = el.nodeName.toLowerCase();
+                    if (el.id) {
+                        selector += '#' + el.id;
+                    } else {
+                        var sib = el, nth = 1;
+                        while (sib.nodeType === Node.ELEMENT_NODE && (sib = sib.previousSibling) && nth++);
+                        selector += ":nth-child(" + nth + ")";
+                    }
+                    path.unshift(selector);
+                    el = el.parentNode;
+                }
+                return path.join(" > ");
+            }
+            
+            // Redefines the push function so that everytime
+            // an event is pushed in the array, a request
+            // is sent to the backend server
+            Object.defineProperty(eventQueue, 'push', {
+                configurable: true,
+                enumerable: false,
+                writable: true,
+                value: function (...args) {
+                    console.log('Push args', args)
+                    console.log('Target', event.currentTarget)
+                    if (typeof args[0] === 'object') {
+                        var objectKeys = Object.keys(args[0])
+                        if (!objectKeys.includes('url')) {
+                            args[0].url = window.location.href
+                            args[0].css_path = elementCSSPath(event.currentTarget)
+                        }
+                    }
+                    let result = Array.prototype.push.apply(this, args)
+                    sendEventToServer(args)
+                    return result
+                }
+            })
+
+            // Replace with your actual tracking endpoint
+            const trackingEndpoint = 'http://127.0.0.1:5000/tracking/js';
 
             // Function to track pageviews
             function trackPageview() {
                 const eventData = {
-                    type: 'pageview',
+                    name: 'pageview',
                     timestamp: new Date().toISOString(),
                     url: window.location.href
                 };
 
                 eventQueue.push(eventData);
-                sendEventToServer(eventData);
+                // sendEventToServer(eventData);
             }
 
             // Function to track custom events
             function trackEvent(eventName, eventData) {
                 const event = {
-                    type: 'event',
+                    name: 'event',
                     timestamp: new Date().toISOString(),
                     eventName: eventName,
                     eventData: eventData
                 };
 
                 eventQueue.push(event);
-                sendEventToServer(event);
+                // sendEventToServer(event);
             }
 
             // Expose functions globally
             window.trackPageview = trackPageview;
             window.trackEvent = trackEvent;
+
             console.log(eventQueue)
         })();
 
@@ -65,7 +114,21 @@
 </head>
 
 <body>
-    something
+    <div class="container">
+        <section class="my-5">
+            <div class="row">
+                <div class="col-sm-12 col-md-5 offset-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <button onclick="eventQueue.push({ name: 'click' })" type="button" class="btn btn-primary btn-lg btn-rounded">
+                                Send event
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
 </body>
 
 </html>
